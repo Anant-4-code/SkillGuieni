@@ -15,6 +15,7 @@ import {
   ThumbsDown
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import { getApiUrl } from '../config/api';
 
 const Chat = () => {
   const [messages, setMessages] = useState([
@@ -77,7 +78,7 @@ const Chat = () => {
 
     try {
       // Call the real Gemini API
-      const response = await fetch('http://localhost:5000/api/chat/message', {
+      const response = await fetch(getApiUrl('CHAT'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -12,7 +12,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? ['https://skillgenie.app', 'https://www.skillgenie.app']
+      ? ['https://skillgenie-frontend.vercel.app', 'https://skillgenie.vercel.app']
       : ['http://localhost:3000', 'http://127.0.0.1:3000'],
     methods: ['GET', 'POST']
   }
@@ -34,7 +34,7 @@ app.use('/api/', limiter);
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://skillgenie.app', 'https://www.skillgenie.app']
+    ? ['https://skillgenie-frontend.vercel.app', 'https://skillgenie.vercel.app']
     : ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true
 }));
