@@ -32,8 +32,17 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000', 
+  'http://127.0.0.1:3000', 
+  'http://127.0.0.1:55620',
+  process.env.FRONTEND_URL,
+  'https://skillgenie-frontend.vercel.app',
+  'https://skillgenie-frontend-anant-4-codes-projects.vercel.app'
+].filter(Boolean); // Remove any undefined values
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://127.0.0.1:55620'],
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
@@ -65,7 +74,8 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'SkillGenie Backend is running!', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    corsOrigins: allowedOrigins
   });
 });
 
@@ -73,9 +83,14 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV,
+    corsEnabled: true
   });
 });
+
+// CORS preflight handler
+app.options('*', cors());
 
 // API routes
 app.use('/api/auth', authRoutes);
