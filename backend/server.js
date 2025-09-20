@@ -60,6 +60,23 @@ const aiMentorRoutes = require('./routes/aiMentor');
 const roadmapRoutes = require('./routes/roadmaps');
 const progressRoutes = require('./routes/progress');
 
+// Health check route
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'SkillGenie Backend is running!', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

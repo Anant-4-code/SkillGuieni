@@ -139,7 +139,8 @@ Top Companies: ${data.data.topCompanies?.slice(0, 3).map(c => c.name || c).join(
             resultDiv.textContent = `🔄 Testing roadmap for ${skill}...`;
             
             try {
-                const response = await fetch('http://localhost:5000/api/roadmaps/generate/dynamic', {
+                const backendUrl = 'https://skillgenie-backend-3hp[your-full-url].vercel.app';
+                const response = await fetch(`${backendUrl}/api/roadmaps/generate/dynamic`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
