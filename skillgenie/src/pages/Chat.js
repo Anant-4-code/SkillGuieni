@@ -112,13 +112,13 @@ const Chat = () => {
     } catch (error) {
       console.error('Error calling AI API:', error);
       
-      // Fallback to local response on error
-      const aiResponse = generateAIResponse(messageText);
+      // Show real error instead of mock response
       const aiMessage = {
         id: Date.now() + 1,
         type: 'ai',
-        content: `⚠️ **Connection Error**: ${aiResponse}`,
-        timestamp: new Date()
+        content: `❌ **API Error**: Failed to connect to Gemini AI. Please check if the backend server is running on port 5000.\n\nError: ${error.message}\n\n🔧 **To fix**: Make sure your backend server is running and Gemini API key is configured.`,
+        timestamp: new Date(),
+        isError: true
       };
       setMessages(prev => [...prev, aiMessage]);
     } finally {

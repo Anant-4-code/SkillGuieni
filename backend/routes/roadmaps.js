@@ -1,7 +1,11 @@
 const express = require('express');
+const router = express.Router();
+const dynamicRoadmapService = require('../services/dynamicRoadmapService');
+const enhancedGeminiAnalyst = require('../services/enhancedGeminiAnalyst');
+const cleanGeminiService = require('../services/cleanGeminiService');
+const workingGeminiService = require('../services/workingGeminiService');
 const { body, validationResult } = require('express-validator');
 const geminiService = require('../services/geminiService');
-const router = express.Router();
 
 // Mock middleware for authentication
 const authenticateToken = (req, res, next) => {
@@ -81,6 +85,66 @@ router.get('/', authenticateToken, (req, res) => {
   }
 });
 
+// @route   POST /api/roadmaps/generate/dynamic
+// @desc    Generate dynamic roadmap using Gemini AI for any skill
+// @access  Public
+router.post('/generate/dynamic', [
+  body('skill').notEmpty().withMessage('Skill is required'),
+  body('level').optional().isIn(['beginner', 'intermediate', 'advanced']),
+  body('duration').optional()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors.array() 
+      });
+    }
+
+    const { skill, level = 'beginner', duration = '3-6 months' } = req.body;
+    
+    console.log(`📚 [ROADMAP API] Request received:`);
+    console.log(`   Skill: "${skill}"`);
+    console.log(`   Level: ${level}`);
+    console.log(`   Duration: ${duration}`);
+    
+    // Create user profile from request (or use default)
+    const userProfile = {
+      profile: {
+        experience: level,
+        education: 'Not specified',
+        skills: [],
+        careerGoals: `Master ${skill}`
+      }
+    };
+    
+    // Use enhancedGeminiAnalyst for detailed roadmap with sub-chapters
+    const result = await enhancedGeminiAnalyst.generatePersonalizedRoadmap(
+      userProfile, 
+      skill, 
+      {} // insights can be empty for now
+    );
+    
+    console.log(`✅ [ROADMAP API] Response generated:`);
+    console.log(`   Title: "${result.data?.title}"`);
+    console.log(`   Chapters: ${result.data?.chapters?.length}`);
+    if (result.data?.chapters?.[0]) {
+      console.log(`   First chapter: "${result.data.chapters[0].title}"`);
+      console.log(`   Sub-chapters: ${result.data.chapters[0].subChapters?.length || 0}`);
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error generating dynamic roadmap:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate roadmap',
+      error: error.message
+    });
+  }
+});
+
 // @route   POST /api/roadmaps/generate
 // @desc    Generate new roadmap based on user preferences
 // @access  Private
@@ -112,7 +176,7 @@ router.post('/generate', [
       learningStyle: preferences.learningStyle || 'Visual'
     };
 
-    const generatedRoadmap = await geminiService.generateRoadmap(userProfile);
+    const generatedRoadmap = await workingGeminiService.generateRoadmap(userProfile.goal, userProfile.experienceLevel);
 
     // Ensure consistent structure
     const roadmap = {

@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const router = express.Router();
+const googleSearchService = require('../services/googleSearchService');
 
 // Mock middleware for authentication
 const authenticateToken = (req, res, next) => {
@@ -12,8 +13,42 @@ const authenticateToken = (req, res, next) => {
   next();
 };
 
+// @route   GET /api/careers/search
+// @desc    Search career opportunities using Google Custom Search
+// @access  Public
+router.get('/search', async (req, res) => {
+  try {
+    const { skill, location = 'India', type = 'jobs' } = req.query;
+    
+    if (!skill) {
+      return res.status(400).json({
+        success: false,
+        message: 'Skill parameter is required'
+      });
+    }
+    
+    console.log(`🔍 Searching ${type} for ${skill} in ${location}`);
+    
+    // Fetch opportunities using Google Custom Search
+    const opportunities = await googleSearchService.fetchCareerOpportunities(skill, location, type);
+    
+    res.json({
+      success: true,
+      data: opportunities,
+      generatedBy: 'Google Custom Search API'
+    });
+  } catch (error) {
+    console.error('Career search error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search opportunities',
+      error: error.message
+    });
+  }
+});
+
 // @route   GET /api/careers/jobs
-// @desc    Get job opportunities
+// @desc    Get job opportunities (legacy route with mock data)
 // @access  Private
 router.get('/jobs', authenticateToken, (req, res) => {
   try {

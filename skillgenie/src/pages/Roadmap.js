@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -18,16 +18,29 @@ import {
   Zap,
   ChevronRight,
   ChevronDown,
-  Settings
+  Settings,
+  Loader
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import youtubeService from '../services/youtubeService';
+import roadmapService from '../services/roadmapService';
+import questionnaireService from '../services/questionnaireService';
 
 const Roadmap = () => {
   const navigate = useNavigate();
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [expandedChapter, setExpandedChapter] = useState(0);
+  const [youtubeVideos, setYoutubeVideos] = useState({});
+  const [loadingVideos, setLoadingVideos] = useState({});
+  const [dynamicRoadmap, setDynamicRoadmap] = useState(null);
+  const [loadingRoadmap, setLoadingRoadmap] = useState(true);
+  const [questionnaireData, setQuestionnaireData] = useState(null);
+  const [selectedSkill, setSelectedSkill] = useState(() => {
+    return questionnaireService.getPrimarySkillRecommendation();
+  });
 
-  const roadmapData = {
+  // Default roadmap data (fallback)
+  const defaultRoadmapData = {
     title: "Data Science & Machine Learning",
     totalDuration: "8-10 months",
     difficulty: "Intermediate",
@@ -38,7 +51,74 @@ const Roadmap = () => {
     completedHours: 84
   };
 
-  const chapters = [
+  const roadmapData = dynamicRoadmap || defaultRoadmapData;
+
+  // Auto-generate roadmap based on questionnaire data
+  useEffect(() => {
+    const generateRoadmap = async () => {
+      console.log('🗺️ [ROADMAP PAGE] Auto-generating roadmap...');
+      
+      // Check for questionnaire data
+      const qData = questionnaireService.getQuestionnaireData();
+      setQuestionnaireData(qData);
+      
+      if (!qData) {
+        console.log('⚠️ [ROADMAP PAGE] No questionnaire data found');
+        setLoadingRoadmap(false);
+        return;
+      }
+      
+      const primarySkill = questionnaireService.getPrimarySkillRecommendation();
+      const experienceLevel = questionnaireService.getExperienceLevel();
+      
+      console.log(`🎯 [ROADMAP PAGE] Generating roadmap for: "${primarySkill}" at "${experienceLevel}" level`);
+      
+      try {
+        const result = await roadmapService.generateDynamicRoadmap(primarySkill, experienceLevel, '3-6 months');
+        console.log('🗺️ [ROADMAP PAGE] Roadmap result:', result);
+        
+        if (result.success && result.data) {
+          console.log(`✅ [ROADMAP PAGE] Roadmap generated: "${result.data.title}"`);
+          console.log('🔍 [ROADMAP PAGE] Roadmap data structure:', result.data);
+          
+          // Ensure the roadmap has the required structure
+          const processedRoadmap = {
+            ...result.data,
+            progress: result.data.progress || 0,
+            completedChapters: result.data.completedChapters || 0,
+            totalChapters: result.data.chapters?.length || 0,
+            estimatedHours: result.data.estimatedHours || 240,
+            completedHours: result.data.completedHours || 0,
+            chapters: result.data.chapters || []
+          };
+          
+          setDynamicRoadmap(processedRoadmap);
+          setSelectedSkill(primarySkill);
+        } else {
+          console.error('❌ [ROADMAP PAGE] Failed to generate roadmap');
+        }
+      } catch (error) {
+        console.error('❌ [ROADMAP PAGE] Error generating roadmap:', error);
+      } finally {
+        setLoadingRoadmap(false);
+      }
+    };
+    
+    generateRoadmap();
+  }, []);
+
+  // Use dynamic roadmap chapters if available, otherwise fallback to static
+  const chapters = (dynamicRoadmap?.chapters && Array.isArray(dynamicRoadmap.chapters)) ? 
+    dynamicRoadmap.chapters.map((chapter, index) => ({
+      ...chapter,
+      id: chapter.id || index + 1,
+      status: index < 2 ? "completed" : index === 2 ? "current" : "locked",
+      progress: index < 2 ? 100 : index === 2 ? 60 : 0,
+      estimatedHours: chapter.estimatedHours || 20,
+      completedHours: index < 2 ? (chapter.estimatedHours || 20) : index === 2 ? 12 : 0,
+      subChapters: chapter.subChapters || [],
+      resources: chapter.resources || []
+    })) : [
     {
       id: 1,
       title: "Python Fundamentals",
@@ -220,6 +300,25 @@ const Roadmap = () => {
     }
   ];
 
+  // Save roadmap data to localStorage for quiz access
+  useEffect(() => {
+    if (dynamicRoadmap || roadmapData) {
+      const dataToSave = {
+        id: dynamicRoadmap?.id || roadmapData?.id || 'default',
+        skill: dynamicRoadmap?.skill || roadmapData?.skill || 'JavaScript',
+        currentChapter: expandedChapter + 1,
+        chapters: chapters.map(chapter => ({
+          ...chapter,
+          // Ensure all chapter data is preserved
+          topics: chapter.topics || [],
+          subChapters: chapter.subChapters || [],
+          resources: chapter.resources || []
+        }))
+      };
+      localStorage.setItem('currentRoadmap', JSON.stringify(dataToSave));
+    }
+  }, [dynamicRoadmap, roadmapData, chapters, expandedChapter]);
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'completed':
@@ -247,6 +346,61 @@ const Roadmap = () => {
     }
   };
 
+  // Fetch YouTube videos for a chapter
+  const fetchChapterVideos = async (chapterId, chapterTitle) => {
+    if (youtubeVideos[chapterId] || loadingVideos[chapterId]) {
+      return; // Already loaded or loading
+    }
+
+    setLoadingVideos(prev => ({ ...prev, [chapterId]: true }));
+
+    try {
+      // Extract skill level from chapter title and description
+      const skillLevel = chapterId <= 2 ? 'beginner' : chapterId <= 5 ? 'intermediate' : 'advanced';
+      
+      // Get skill recommendations for the chapter topic
+      const result = await youtubeService.getSkillRecommendations(chapterTitle, skillLevel, {
+        safeSearch: 'strict',
+        regionCode: 'US'
+      });
+
+      if (result.success && result.data.recommendations) {
+        setYoutubeVideos(prev => ({
+          ...prev,
+          [chapterId]: result.data.recommendations.slice(0, 3) // Limit to 3 videos per chapter
+        }));
+      } else {
+        // Fallback to search if skill recommendations fail
+        const searchResult = await youtubeService.searchVideos(`${chapterTitle} tutorial`, {
+          maxResults: 3,
+          safeSearch: 'strict',
+          order: 'relevance'
+        });
+
+        if (searchResult.success && searchResult.data.videos) {
+          setYoutubeVideos(prev => ({
+            ...prev,
+            [chapterId]: searchResult.data.videos
+          }));
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching videos for chapter ${chapterId}:`, error);
+      // Set empty array to prevent retrying
+      setYoutubeVideos(prev => ({ ...prev, [chapterId]: [] }));
+    } finally {
+      setLoadingVideos(prev => ({ ...prev, [chapterId]: false }));
+    }
+  };
+
+  // Load videos when chapter is expanded
+  useEffect(() => {
+    if (expandedChapter >= 0 && chapters[expandedChapter]) {
+      const chapter = chapters[expandedChapter];
+      fetchChapterVideos(chapter.id, chapter.title);
+    }
+  }, [expandedChapter]);
+
   const getResourceIcon = (type) => {
     switch (type) {
       case 'video':
@@ -264,6 +418,35 @@ const Roadmap = () => {
     }
   };
 
+  // Show loading state while generating roadmap
+  if (loadingRoadmap) {
+    return (
+      <div className="min-h-screen bg-dark-primary flex">
+        <Sidebar />
+        <div className="flex-1 ml-64 flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center"
+          >
+            <div className="w-24 h-24 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mx-auto mb-6 animate-pulse">
+              <Target className="w-12 h-12 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-4">Generating Your Personalized Roadmap</h2>
+            <p className="text-gray-400 mb-8">
+              Creating a learning path for {selectedSkill} based on your questionnaire responses...
+            </p>
+            <div className="flex justify-center space-x-2">
+              <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce"></div>
+              <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-3 h-3 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-dark-primary flex">
       <Sidebar />
@@ -275,9 +458,15 @@ const Roadmap = () => {
             <div>
               <h1 className="text-2xl font-bold mb-1 flex items-center gap-3">
                 <Target className="w-8 h-8 text-neon-blue" />
-                {roadmapData.title} Roadmap
+                {dynamicRoadmap?.title || roadmapData.title}
+                {questionnaireData && <span className="text-green-400 text-sm ml-2">✓ Personalized</span>}
               </h1>
-              <p className="text-gray-400">Your personalized learning journey</p>
+              <p className="text-gray-400">
+                {questionnaireData ? 
+                  `Auto-generated based on your questionnaire responses` :
+                  'Your personalized learning journey'
+                }
+              </p>
             </div>
             <div className="flex items-center gap-4">
               <button className="btn-secondary flex items-center gap-2">
@@ -337,7 +526,27 @@ const Roadmap = () => {
 
           {/* Roadmap Timeline */}
           <div className="space-y-4">
-            {chapters.map((chapter, index) => (
+            {!chapters || chapters.length === 0 ? (
+              <div className="light-card p-8 text-center">
+                <Target className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">No Roadmap Available</h3>
+                <p className="text-gray-600 mb-4">
+                  {!questionnaireData ? 
+                    'Please complete the questionnaire to generate your personalized roadmap.' :
+                    'Unable to generate roadmap. Please try again later.'
+                  }
+                </p>
+                {!questionnaireData && (
+                  <button
+                    onClick={() => navigate('/questionnaire')}
+                    className="btn-primary"
+                  >
+                    Take Questionnaire
+                  </button>
+                )}
+              </div>
+            ) : (
+              (chapters || []).map((chapter, index) => (
               <motion.div
                 key={chapter.id}
                 initial={{ opacity: 0, x: -20 }}
@@ -399,7 +608,14 @@ const Roadmap = () => {
                     <div className="flex items-center gap-4">
                       {chapter.status === 'in_progress' && (
                         <button 
-                          onClick={() => navigate('/quiz')}
+                          onClick={() => navigate('/quiz', { 
+                            state: { 
+                              skill: roadmapData?.skill || 'JavaScript',
+                              chapter: chapter.id || index + 1,
+                              chapterData: chapter,
+                              roadmapId: roadmapData?.id || 'default'
+                            }
+                          })}
                           className="btn-primary flex items-center gap-2"
                         >
                           <Play className="w-4 h-4" />
@@ -408,7 +624,14 @@ const Roadmap = () => {
                       )}
                       {chapter.status === 'completed' && (
                         <button 
-                          onClick={() => navigate('/quiz')}
+                          onClick={() => navigate('/quiz', { 
+                            state: { 
+                              skill: roadmapData?.skill || 'JavaScript',
+                              chapter: chapter.id || index + 1,
+                              chapterData: chapter,
+                              roadmapId: roadmapData?.id || 'default'
+                            }
+                          })}
                           className="btn-secondary flex items-center gap-2"
                         >
                           <Award className="w-4 h-4" />
@@ -435,7 +658,7 @@ const Roadmap = () => {
                         <div>
                           <h4 className="font-semibold text-gray-800 mb-4">Sub-chapters</h4>
                           <div className="space-y-3">
-                            {chapter.subChapters.map((subChapter, subIndex) => (
+                            {(chapter.subChapters || []).map((subChapter, subIndex) => (
                               <div key={subIndex} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                                 {subChapter.completed ? (
                                   <CheckCircle className="w-5 h-5 text-green-500" />
@@ -462,8 +685,50 @@ const Roadmap = () => {
                         <div>
                           <h4 className="font-semibold text-gray-800 mb-4">Recommended Resources</h4>
                           <div className="space-y-3">
-                            {chapter.resources.map((resource, resIndex) => (
-                              <div key={resIndex} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                            {/* YouTube Videos */}
+                            {loadingVideos[chapter.id] && (
+                              <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
+                                <Loader className="w-5 h-5 animate-spin text-blue-500 mr-2" />
+                                <span className="text-gray-600">Loading YouTube videos...</span>
+                              </div>
+                            )}
+                            
+                            {youtubeVideos[chapter.id] && youtubeVideos[chapter.id].map((video, videoIndex) => (
+                              <div 
+                                key={`youtube-${videoIndex}`} 
+                                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                                onClick={() => youtubeService.openVideo(video.id)}
+                              >
+                                <div className="relative">
+                                  <img 
+                                    src={youtubeService.getThumbnailUrl(video.thumbnail, 'medium')} 
+                                    alt={video.title}
+                                    className="w-16 h-12 object-cover rounded"
+                                    onError={(e) => {
+                                      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA2NCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yNiAzMkwyNiAxNkwzOCAyNEwyNiAzMloiIGZpbGw9IiM2QjczODAiLz4KPC9zdmc+';
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <Play className="w-6 h-6 text-white drop-shadow-lg" />
+                                  </div>
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-800 line-clamp-2">{video.title}</p>
+                                  <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                                    <Video className="w-3 h-3" />
+                                    <span>YouTube</span>
+                                    {video.duration && <span>• {youtubeService.formatDuration(video.duration)}</span>}
+                                    {video.viewCount && <span>• {youtubeService.formatViewCount(video.viewCount)}</span>}
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-1">{video.channel?.title}</p>
+                                </div>
+                                <ExternalLink className="w-4 h-4 text-gray-400" />
+                              </div>
+                            ))}
+
+                            {/* Static Resources */}
+                            {(chapter.resources || []).map((resource, resIndex) => (
+                              <div key={`static-${resIndex}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                                 <div className="p-2 bg-white rounded-lg">
                                   {getResourceIcon(resource.type)}
                                 </div>
@@ -487,7 +752,8 @@ const Roadmap = () => {
                   )}
                 </div>
               </motion.div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Completion Milestone */}

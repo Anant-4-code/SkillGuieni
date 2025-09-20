@@ -10,6 +10,10 @@ import Roadmap from './pages/Roadmap';
 import Chat from './pages/Chat';
 import Quiz from './pages/Quiz';
 import Career from './pages/Career';
+import YouTubeTest from './components/YouTubeTest';
+import DynamicRoadmap from './components/DynamicRoadmap';
+import DynamicAnalytics from './components/DynamicAnalytics';
+import NavigationHelper from './components/NavigationHelper';
 import './App.css';
 
 function App() {
@@ -37,6 +41,10 @@ function App() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/quiz" element={<Quiz />} />
           <Route path="/career" element={<Career />} />
+          <Route path="/youtube-test" element={<YouTubeTest />} />
+          <Route path="/dynamic-roadmap" element={<DynamicRoadmap />} />
+          <Route path="/dynamic-analytics" element={<DynamicAnalytics />} />
+          <Route path="/navigation" element={<NavigationHelper />} />
         </Routes>
       </div>
     </Router>

@@ -1,7 +1,10 @@
 const express = require('express');
+const router = express.Router();
+const dynamicRoadmapService = require('../services/dynamicRoadmapService');
+const cleanGeminiService = require('../services/cleanGeminiService');
+const workingGeminiService = require('../services/workingGeminiService');
 const { body, validationResult } = require('express-validator');
 const geminiService = require('../services/geminiService');
-const router = express.Router();
 
 // Mock middleware for authentication
 const authenticateToken = (req, res, next) => {
@@ -13,9 +16,38 @@ const authenticateToken = (req, res, next) => {
   next();
 };
 
+// @route   GET /api/analytics/market/dynamic
+// @desc    Get dynamic market analytics using// Generate dynamic market analytics with AI and questionnaire data
+router.post('/market/dynamic', async (req, res) => {
+  try {
+    const { skill, location = 'Global', userProfile } = req.body;
+    
+    if (!skill) {
+      return res.status(400).json({
+        success: false,
+        message: 'Skill parameter is required'
+      });
+    }
+    
+    console.log(`📊 Generating personalized analytics for ${skill} in ${location}`);
+    console.log(`👤 User Profile:`, userProfile);
+    
+    const result = await workingGeminiService.generateAnalytics(skill, location, userProfile);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error generating dynamic analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate analytics',
+      error: error.message
+    });
+  }
+});
+
 // @route   GET /api/analytics/market
-// @desc    Get market analysis data
-// @access  Private
+// @desc    Get market analytics for skills/careers
+// @access  Public
 router.get('/market', authenticateToken, async (req, res) => {
   try {
     const { domain = 'data-science', region = 'global' } = req.query;

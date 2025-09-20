@@ -16,6 +16,7 @@ import {
   Lightbulb
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import questionnaireService from '../services/questionnaireService';
 
 const Questionnaire = () => {
   const navigate = useNavigate();
@@ -198,11 +199,26 @@ const Questionnaire = () => {
   };
 
   const handleSubmit = async () => {
-    toast.success('Analyzing your responses...');
-    // Simulate AI processing
-    setTimeout(() => {
-      navigate('/analysis');
-    }, 2000);
+    console.log('📝 Submitting questionnaire data:', formData);
+    
+    // Save questionnaire data
+    const savedData = questionnaireService.saveQuestionnaireData(formData);
+    
+    if (savedData) {
+      toast.success('Analyzing your responses...');
+      console.log('✅ Questionnaire data saved successfully');
+      
+      // Generate personalized recommendations
+      const recommendations = questionnaireService.generatePersonalizedRecommendations();
+      console.log('🎯 Generated recommendations:', recommendations);
+      
+      // Simulate AI processing
+      setTimeout(() => {
+        navigate('/analysis');
+      }, 2000);
+    } else {
+      toast.error('Failed to save your responses. Please try again.');
+    }
   };
 
   const isStepValid = () => {

@@ -33,10 +33,11 @@ app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://skillgenie-frontend.vercel.app', 'https://skillgenie.vercel.app']
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  credentials: true
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://127.0.0.1:55620'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  exposedHeaders: ['Content-Length', 'Content-Type']
 }));
 
 // Body parsing middleware
@@ -49,11 +50,15 @@ app.use(morgan('combined'));
 // Import routes
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
-const roadmapRoutes = require('./routes/roadmaps');
+const cleanGeminiService = require('./services/cleanGeminiService');
 const quizRoutes = require('./routes/quizzes');
 const chatRoutes = require('./routes/chat');
 const careerRoutes = require('./routes/careers');
 const analyticsRoutes = require('./routes/analytics');
+const youtubeRoutes = require('./routes/youtube');
+const aiMentorRoutes = require('./routes/aiMentor');
+const roadmapRoutes = require('./routes/roadmaps');
+const progressRoutes = require('./routes/progress');
 
 // API routes
 app.use('/api/auth', authRoutes);
@@ -63,6 +68,9 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/careers', careerRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/youtube', youtubeRoutes);
+app.use('/api/ai-mentor', aiMentorRoutes);
+app.use('/api/progress', progressRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -138,10 +146,13 @@ io.on('connection', (socket) => {
 });
 
 // Start server
-server.listen(PORT, () => {
-  console.log(`🚀 SkillGenie API server running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🔑 Gemini API Key: ${process.env.GEMINI_API_KEY ? 'Available ✅' : 'Missing ❌'}`);
+  console.log(`🌐 Server URL: http://localhost:${PORT}`);
+  console.log(`📈 Analytics endpoint: http://localhost:${PORT}/api/analytics/market/dynamic`);
+  console.log(`🗺️ Roadmap endpoint: http://localhost:${PORT}/api/roadmaps/generate/dynamic`);
   console.log(`🔌 WebSocket server ready`);
 });
 

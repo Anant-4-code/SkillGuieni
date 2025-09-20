@@ -7,9 +7,14 @@ const API_CONFIG = {
     SUGGESTIONS: '/api/chat/suggestions',
     ROADMAP: '/api/roadmaps/generate',
     QUIZ: '/api/quizzes/chapter',
-    ANALYTICS: '/api/analytics/market'
+    ANALYTICS: '/api/analytics/market',
+    YOUTUBE_SEARCH: '/api/youtube/search',
+    YOUTUBE_SKILL_RECOMMENDATIONS: '/api/youtube/recommendations/skill',
+    YOUTUBE_TRENDING: '/api/youtube/trending'
   }
 };
+
+export const API_ENDPOINTS = API_CONFIG.ENDPOINTS;
 
 export const getApiUrl = (endpoint) => {
   return `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS[endpoint] || endpoint}`;
